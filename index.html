@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <title>잡았다, 루이! — AR 숨바꼭질</title>
+
+  <!-- A-Frame + AR.js (GPS 기반) -->
+  <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+
+  <style>
+    /* ── 동화책 느낌의 UI: 모래빛 크림 + 바다 파랑 + 산호 빨강 ── */
+    :root {
+      --sand:  #FFF6E3;
+      --sea:   #2E7FA8;
+      --coral: #FF6B57;
+      --ink:   #4A3B2A;
+    }
+    html, body { margin: 0; height: 100%; overflow: hidden; font-family: sans-serif; }
+
+    /* 상단 이야기 안내판 */
+    #storyBar {
+      position: fixed; z-index: 20; top: 12px; left: 12px; right: 12px;
+      background: var(--sand); color: var(--ink);
+      border: 3px solid var(--sea); border-radius: 16px;
+      padding: 12px 14px; text-align: center;
+      font-size: 16px; line-height: 1.5;
+      box-shadow: 0 3px 0 rgba(0,0,0,.15);
+    }
+    #storyBar b { color: var(--sea); }
+
+    /* 소리지르기 버튼 — 인형을 탭하면 등장 */
+    #shoutBtn {
+      position: fixed; z-index: 20; bottom: 28px; left: 50%;
+      transform: translateX(-50%);
+      padding: 16px 34px; font-size: 19px; font-weight: bold;
+      color: #fff; background: var(--coral);
+      border: none; border-radius: 999px;
+      box-shadow: 0 4px 0 #C24A3B;
+      display: none;
+    }
+    #shoutBtn:active { transform: translateX(-50%) translateY(3px); box-shadow: 0 1px 0 #C24A3B; }
+
+    /* 결말 화면 */
+    #ending {
+      position: fixed; z-index: 30; inset: 0;
+      display: none; flex-direction: column;
+      align-items: center; justify-content: center; gap: 14px;
+      background: rgba(46,127,168,.85); color: #fff; text-align: center;
+    }
+    #ending h1 { font-size: 40px; margin: 0; text-shadow: 0 3px 0 rgba(0,0,0,.25); }
+    #ending p  { font-size: 17px; margin: 0; opacity: .95; }
+
+    /* 시작 화면 (카메라/GPS 권한 안내) */
+    #startScreen {
+      position: fixed; z-index: 40; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 16px;
+      background: var(--sand); color: var(--ink); text-align: center; padding: 24px;
+    }
+    #startScreen h1 { font-size: 30px; margin: 0; color: var(--sea); }
+    #startScreen p  { font-size: 16px; line-height: 1.6; margin: 0; max-width: 320px; }
+    #startBtn {
+      padding: 14px 36px; font-size: 19px; font-weight: bold;
+      color: #fff; background: var(--coral);
+      border: none; border-radius: 999px; box-shadow: 0 4px 0 #C24A3B;
+    }
+  </style>
+</head>
+<body>
+
+  <script>
+    const SPOT = { lat: 37.652993, lng: 127.015639 };  // ← 지점 좌표 입력
+  </script>
+
+  <!-- 시작 화면 -->
+  <div id="startScreen">
+    <h1>잡았다, 루이!</h1>
+    <p>루이가 거위 인형을 안고 숨었어요.<br/>
+       엄마가 되어 <b>거위 인형</b>을 찾아<br/>탭해서 루이를 찾아 주세요!</p>
+    <button id="startBtn">숨바꼭질 시작</button>
+    <p style="font-size:13px; opacity:.7;">카메라와 위치 권한을 허용해 주세요</p>
+  </div>
+
+  <!-- 이야기 안내판 -->
+  <div id="storyBar" style="display:none;">
+    <b>루이가 어디 있을까?</b><br/>주변을 둘러보고 거위 인형을 탭해 보세요 🪿
+  </div>
+
+  <!-- 소리지르기 버튼 (인형 탭 시 등장) -->
+  <button id="shoutBtn">📣 “나 잡아 봐라, 루이!”</button>
+
+  <!-- 결말 화면 -->
+  <div id="ending">
+    <h1>“잡았다, 엄마!"</h1>
+  </div>
+
+  <!-- ════════════════ AR 장면 ════════════════ -->
+  <a-scene
+    id="scene"
+    vr-mode-ui="enabled: false"
+    embedded
+    arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
+    renderer="antialias: true; alpha: true">
+
+    <!-- 화면 탭으로 오브젝트 클릭 -->
+    <a-entity cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
+
+    <!-- 관람자 카메라 = 엄마의 시점 -->
+    <a-camera id="cam" gps-camera rotation-reader></a-camera>
+
+    <a-entity id="spot">
+
+      <!-- 수풀 (가림막) -->
+      <a-entity gltf-model="./grass.glb" position="0 0.3 0" scale="1 1 1"></a-entity>
+
+      <!-- 거위 인형 (탭 가능) — 살랑살랑 흔들림 -->
+      <a-entity id="doll" class="clickable"
+                gltf-model="./duck.glb"
+                position="0 0.3 0" scale="1 1 1"
+                animation="property: rotation; to: 0 0 6; dir: alternate;
+                           loop: true; dur: 900; easing: easeInOutSine"></a-entity>
+
+      <!-- 루이 (처음엔 숨김 → 인형 클릭 시 폴짝 튀어오르며 등장) -->
+      <a-entity id="louis" visible="false"
+                gltf-model="./lui.glb"
+                position="0 0.3 3" scale="0 0 0"
+                animation__appear="property: scale; from: 0 0 0; to: 1 1 1;
+                                   dur: 600; easing: easeOutBack; startEvents: appear"
+                animation__jump="property: position; from: 0 0 1; to: 0 0.3 0;
+                                 dur: 700; easing: easeOutQuad; startEvents: appear"
+      ></a-entity>
+    </a-entity>
+  </a-scene>
+
+  <!-- AI 활용 -->
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let found = false;
+
+    /* ── 장면 배치: GPS 좌표에 지점을 고정 ── */
+    function placeEntities() {
+      const s = $('spot');
+      s.setAttribute('gps-entity-place', `latitude: ${SPOT.lat}; longitude: ${SPOT.lng};`);
+      s.setAttribute('scale', '3 3 3');
+    }
+
+    /* ── 시작 버튼: 권한 요청을 사용자 탭으로 시작 ── */
+    $('startBtn').addEventListener('click', () => {
+      $('startScreen').style.display = 'none';
+      $('storyBar').style.display = 'block';
+      placeEntities();
+    });
+
+    /* ── 인터랙션 ①: 거위 인형 탭 → 소리지르기 버튼 등장 ── */
+    $('doll').addEventListener('click', () => {
+      if (found) return;
+      found = true;
+      $('storyBar').innerHTML =
+        '<b>거위 인형을 찾았어요!</b><br/>크게 외쳐서 루이를 불러 보세요 📣';
+      $('shoutBtn').style.display = 'block';
+    });
+
+    /* ── 인터랙션 ②: 소리지르기 → 나레이션 → 2초 뒤 루이 등장 + 결말 ── */
+    $('shoutBtn').addEventListener('click', () => {
+      $('shoutBtn').style.display = 'none';
+      /* 나레이션 문구 */
+      $('storyBar').innerHTML =
+        '<b>“나 잡아 봐라, 루이!”</b><br/>루이가 달려나와 엄마를 잡았지요!';
+      /* 2초 뒤 루이 3D 등장 애니메이션 실행 */
+      setTimeout(() => {
+        $('louis').setAttribute('visible', 'true');
+        $('louis').emit('appear');           // 루이 폴짝 등장
+      }, 2000);
+      /* 등장 애니메이션이 보인 뒤 “잡았다, 엄마!” 결말 화면 */
+      setTimeout(() => { $('ending').style.display = 'flex'; }, 2900);
+    });
+  </script>
+</body>
+</html>
