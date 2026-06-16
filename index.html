@@ -113,19 +113,19 @@
     <a-entity id="spot">
 
       <!-- 수풀 (가림막) -->
-      <a-entity gltf-model="./grass.glb" position="0 -1.7 0" scale="3 3 3"></a-entity>
+      <a-entity gltf-model="./grass.glb" position="0 -1.7 0" scale="3 3 3" rotation="0 0 75"></a-entity>
 
       <!-- 거위 인형 (탭 가능) — 살랑살랑 흔들림 -->
       <a-entity id="doll" class="clickable"
                 gltf-model="./duck.glb"
-                position="0 -1.7 0" scale="3 3 3"
-                animation="property: rotation; to: 0 0 6; dir: alternate;
+                position="0 -1.7 0" scale="3 3 3" rotation="0 0 75"
+                animation="property: rotation; from: 0 0 69; to: 0 0 81; dir: alternate;
                            loop: true; dur: 900; easing: easeInOutSine"></a-entity>
 
       <!-- 루이 (처음엔 숨김 → 인형 클릭 시 폴짝 튀어오르며 등장) -->
       <a-entity id="louis" visible="false"
                 gltf-model="./lui.glb"
-                position="0 0.3 3" scale="0 0 0"
+                position="0 -1.7 3" scale="0 0 0" rotation="0 0 75"
                 animation__appear="property: scale; from: 0 0 0; to: 1 1 1;
                                    dur: 600; easing: easeOutBack; startEvents: appear"
                 animation__jump="property: position; from: 0 -1.7 1; to: 0 -1.7 0;
